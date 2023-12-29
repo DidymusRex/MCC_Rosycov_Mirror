@@ -1,0 +1,103 @@
+mcc-cthulu prep
+
+sudo apt-get update
+sudo apt-get remove chromium-browser cups
+sudo apt-get upgrade
+sudo apt-get autoremove
+
+# ----------------------------------------------------------
+# Set up touch screen
+# https://littlebirdelectronics.com.au/guides/42/5-inch-touch-screen-display-with-raspberry-pi
+# ----------------------------------------------------------
+cd $HOME
+wget http://cdn.littlebird.com.au/drivers/LCD-show-180817.tar.gz
+tar xf LCD-show-180817.tar.gz
+
+# if the Xinput calibrator is not in LCD_show ...
+    cd Downloads
+    wget http://cdn.littlebird.com.au/drivers/Xinput-calibrator_0.7.5-1_armhf.zip
+    unzip Xinput-calibrator_0.7.5-1_armhf.zip
+
+# edit /boot/config.txt
+sudo vi /boot/config.txt
+max_usb_current=1
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt 800 480 60 6 0 0 0
+hdmi_drive=1
+
+# install above drivers cmake does not like the cache file
+cd ~/LCD-show/rpi-fbcp/build
+mv CMakeCache.txt CMakeCache.txt.old
+sudo cmake ..
+sudo make
+sudo install fbcp /usr/local/bin/fbcp
+
+cd LCD_Show
+sudo ./LCD5_show
+<system reboots>
+
+Pi menu -> Preferences -> calibrate touchscreen
+copy output
+create /etc/X11/xorg.conf.d/99-calibration.conf
+sudo su -
+cd /etc/X11/xorg.conf.d/
+vi 99-calibration.conf
+
+# Calibrating EVDEV driver for "ADS7846 Touchscreen" id=10
+#   current calibration values (from XInput): min_x=208, max_x=3905 and min_y=288, max_y=3910
+Section "InputClass"
+Identifier      "calibration"
+MatchProduct    "ADS7846 Touchscreen"
+Option  "Calibration"   "208 3905 3910 288"
+EndSection
+
+<reboot manually or wait until after mosquitto install>
+# ----------------------------------------------------------
+# Set up mosquitto
+# https://randomnerdtutorials.com/how-to-install-mosquitto-broker-on-raspberry-pi/
+# ----------------------------------------------------------
+sudo apt install -y mosquitto mosquitto-clients
+sudo mosquitto_passwd -c /etc/mosquitto/passwd YOUR_USERNAME
+sudo vi /etc/mosquitto/mosquitto.conf
+
+    # top of file
+    per_listener_settings true
+
+    # end of file
+    allow_anonymous false
+    listener 1883
+    password_file /etc/mosquitto/passwd
+
+    # ----- sample
+    # Place your local configuration in /etc/mosquitto/conf.d/
+    #
+    # A full description of the configuration file is at
+    # /usr/share/doc/mosquitto/examples/mosquitto.conf.example
+
+    per_listener_settings true
+
+    pid_file /run/mosquitto/mosquitto.pid
+
+    persistence true
+    persistence_location /var/lib/mosquitto/
+
+    log_dest file /var/log/mosquitto/mosquitto.log
+
+    include_dir /etc/mosquitto/conf.d
+    allow_anonymous false
+    listener 1883
+    password_file /etc/mosquitto/passwd
+    # -----
+sudo systemctl enable mosquitto.service
+sudo systemctl status mosquitto
+
+# ----------------------------------------------------------
+12/28/2023 JWG - Touchscreen not responding. (apparently timed out in previous calibration.)
+rebuilt fbcp - no help
+recloned repo and rebuilt fbcp (eliminated ioctl warning) - no help
+Well, DUH! header was only on one row of pins. Now it only need one power connection too
+
+pip install paho-mqtt pygame
+Chat GPTed a basic Pythom tk-mqtt program ...
+
