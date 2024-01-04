@@ -101,3 +101,4 @@ Well, DUH! header was only on one row of pins. Now it only need one power connec
 pip install paho-mqtt pygame
 Chat GPTed a basic Pythom tk-mqtt program ...
 
+https://www.dexterindustries.com/howto/make-your-raspberry-pi-speak/
