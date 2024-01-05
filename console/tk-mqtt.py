@@ -1,4 +1,5 @@
 import tkinter as tk
+import os
 import paho.mqtt.client as mqtt
 from pygame import mixer
 from config import *
@@ -6,7 +7,7 @@ from config import *
 class MQTTWindow:
     def __init__(self, master):
         self.master = master
-        self.master.title("MQTT Text Update")
+        self.master.title("Rosycov Mirror Status")
 
         # Configure the window to be full-screen without a title bar
         self.master.attributes("-fullscreen", True)
@@ -50,19 +51,20 @@ class MQTTWindow:
         client.subscribe("mcc/p1/event")
         client.subscribe("mcc/p2/event")
         client.subscribe("mcc/p3/event")
-        client.subscribe("mcc/sound")
+        client.subscribe("mcc/console/sound")
+        client.subscribe("mcc/console/speak")
 
     def on_message(self, client, userdata, msg):
         # Update the appropriate text box with the received MQTT message
         topic = msg.topic
         message = msg.payload.decode("utf-8")
 
-        if topic == "mcc/sound":
+        if topic == "mcc/console/sound":
             self.play_sound(message)
+        elif topic == "mcc/console/speak":
+            self.speak_text(message)
         elif topic == "mcc/p1/event":
             self.update_text_box(self.p1_box, message)
-            if "solved" in message.lower():
-                self.play_sound("solved.mp3")
         elif topic == "mcc/p2/event":
             self.update_text_box(self.p2_box, message)
         elif topic == "mcc/p3/event":
@@ -94,8 +96,12 @@ class MQTTWindow:
         text_box.see(tk.END)
 
     def play_sound(self, sound_file):
-        mixer.music.load("/home/jgrover/Projects/sfx/" + sound_file)
+        mixer.music.load(sfx_location + sound_file)
         mixer.music.play()
+
+    def speak_text(self, text):
+        # this is an insecure methodlogy...
+        os.system(f'espeak "{text}"')
 
     def publish_message(self):
         # Publish the message "button" to the specified MQTT topic
