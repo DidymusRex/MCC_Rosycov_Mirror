@@ -1,7 +1,7 @@
 import tkinter as tk
 import paho.mqtt.client as mqtt
 from pygame import mixer
-from config import mqtt_broker, mqtt_port, mqtt_subscribe_topic, mqtt_publish_topic, mqtt_username, mqtt_password
+from config import *
 
 class MQTTWindow:
     def __init__(self, master):
