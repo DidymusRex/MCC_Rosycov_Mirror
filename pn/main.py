@@ -1,9 +1,9 @@
 """
 Project: Rosycov Mirror
-File:    main.py (for RM device p2)
+File:    main.py (for RM device pn)
 Target:  Raspberry Pi Pico W with RP2040
 Description:
-Puzzle two in the Rosycov Mirror series. 
+Puzzle n in the Rosycov Mirror series. 
 """
 from config import *
 import errno
@@ -83,23 +83,22 @@ def main():
 
     ap_if.active(False)
     sta_if.active(True)
-    sta_if.connect(SSID, SSID_PW)
+    sta_if.connect(ssid, ssid_pw)
     
     while not sta_if.isconnected(): pass
  
-    print(f'Connecting to MQTT Broker :: {MQTT_BROKER}')
-    mqttClient = MQTTClient(CLIENT_ID, MQTT_BROKER, user=MQTT_USER, password=MQTT_PW, keepalive=60)
-
+    print(f'Connecting to MQTT Broker :: {mqtt_broker}')
+    mqttClient = MQTTClient(mqtt_client_id, mqtt_broker, user=mqtt_username, password=mqtt_password, keepalive=60)
     mqttClient.connect()
-    print(f'Connected to MQTT Broker :: {MQTT_BROKER}')
-    
+
+    print(f'Subscribing to MQTT Broker :: {mqtt_broker}')
     mqttClient.set_callback(sub_cb)
-    mqttClient.subscribe(MQTT_SUB)
-    print(f'Subscribed to {MQTT_SUB} listening for message')
+    mqttClient.subscribe(mqtt_subscribe_topic)
+    print(f'Subscribed to {mqtt_subscribe_topic} listening for message')
 
     # tell the console we are up and running
-    print(f'Sending status online')
-    mqtt_publish(mqttClient, MQTT_ROOT + '/status', 'online')
+    print(f'Sending status = online')
+    mqtt_publish(mqttClient, mqtt_root + '/status', 'online')
     
     # give the game master needed information
     print(f'Sending cheat')
@@ -109,7 +108,7 @@ def main():
         mqttClient.check_msg()
         if (time.time() - last_publish) >= publish_interval:
             random = randint(1,100)
-            mqttClient.publish(MQTT_ROOT + '/random', str(random).encode())
+            mqttClient.publish(mqtt_root + '/random', str(random).encode())
             last_publish = time.time()
 
     # solution achieved!
