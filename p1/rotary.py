@@ -161,4 +161,3 @@ class Rotary(object):
                 micropython.schedule(_trigger, self)
         except:
             pass
-

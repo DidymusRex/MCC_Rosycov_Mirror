@@ -224,4 +224,3 @@ class TM1637Decimal(TM1637):
             segments[j] = self.encode_char(string[i])
             j += 1
         return segments
-
