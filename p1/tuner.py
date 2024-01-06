@@ -4,10 +4,10 @@ File: tuner.py
 Target: Raspberry Pi Pico W
 Description: Micropyton class for puzzle one of the MCC Rosycov Mirror project
 """
-from machine import Pin
-from math import fabs, floor
-from random import randrange, randint
-from rotary_irq_rp2 import RotaryIRQ
+import machine
+import math
+import random
+import rotary_irq_rp2
 import tm1637
 
 class Tuner:
@@ -41,8 +41,8 @@ class Tuner:
         print(f'creating {self.color} tuner')
 
         # set up the 4 digit LED display
-        self.display = tm1637.TM1637(clk=Pin(display_clk_pinNo),
-                                     dio=Pin(display_dio_pinNo))
+        self.display = tm1637.TM1637(clk=machine.Pin(display_clk_pinNo),
+                                     dio=machine.Pin(display_dio_pinNo))
 
         # set up the rotary encoder
         # if either pin number is < 0 there is no encoder
@@ -51,16 +51,16 @@ class Tuner:
             self.cur_val = 0
         else:
             #randomly set cur_val in the range but not closer than 20 to tgt_val
-            self.cur_val = randint(min_val, max_val)
-            while fabs(self.cur_val - self.tgt_val) < 20:
-                self.cur_val = randint(min_val, max_val)
+            self.cur_val = random.randint(min_val, max_val)
+            while math.fabs(self.cur_val - self.tgt_val) < 20:
+                self.cur_val = random.randint(min_val, max_val)
 
-            self.rotary = RotaryIRQ(rotary_clk_pinNo,
+            self.rotary = rotary_irq_rp2.RotaryIRQ(rotary_clk_pinNo,
                                     rotary_dt_pinNo,
                                     min_val,
                                     max_val,
                                     reverse=True,
-                                    range_mode=RotaryIRQ.RANGE_WRAP)
+                                    range_mode=rotary_irq_rp2.RotaryIRQ.RANGE_WRAP)
             self.rotary.set(value=self.cur_val)
 
         # set up the rotary encoder button
@@ -68,7 +68,7 @@ class Tuner:
         if button_pinNo < 0:
             self.button = None
         else:
-            self.button = Pin(button_pinNo, Pin.IN, Pin.PULL_UP)
+            self.button = machine.Pin(button_pinNo, machine.Pin.IN, machine.Pin.PULL_UP)
 
     # provide control information
     def has_rotary(self):
@@ -123,15 +123,15 @@ class Tuner:
 
         # the display gets brighter as the value approaches the target value
         # brightness can be 0-7
-        b = fabs(self.tgt_val - self.cur_val)
+        b = math.fabs(self.tgt_val - self.cur_val)
         if b == 0:
             bright=7
         elif b > 69:
             bright = 0
         else:
-            bright = 7 - floor(b % 70 / 10)
+            bright = 7 - math.floor(b % 70 / 10)
 
-        if bright == 7 and not fabs(self.tgt_val - self.cur_val) == 0:
+        if bright == 7 and not math.fabs(self.tgt_val - self.cur_val) == 0:
             bright = 6
             
         self.display.number(self.cur_val)
@@ -147,7 +147,7 @@ class Tuner:
 
     # set a random pattern on the display
     def randomize_display(self):
-        self.display.write([randrange(128), randrange(128), randrange(128), randrange(128)])
+        self.display.write([random.randrange(128), random.randrange(128), random.randrange(128), random.randrange(128)])
         
     # return the current button value.
     # if there is no button return 1

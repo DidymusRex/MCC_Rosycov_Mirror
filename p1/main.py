@@ -12,29 +12,26 @@ decreases the value. The puzzle is solved when the white tuner shows its
 target value.
 """
 from config import *
+from grids import *
+from umqtt.simple import MQTTClient
+
 import errno
 import gc
-from machine import Pin, PWM
+import machine
 import math
-from math import fabs, floor
 import network
-import random
-from rotary_irq_rp2 import RotaryIRQ
-from stepper import Stepper
-from time import sleep, sleep_ms, time
-import tm1637
-from tuner import Tuner
-import ubinascii
-from umqtt.simple import MQTTClient
+import stepper
+import time
+import tuner
 import utime
 
 # ----------------------------------------------------------
 
-# perform a soft reset
+# perform a soft machine.reset
 def reset():
     debug()
-    print('Resetting...')
-    sleep(5)
+    print('Reset:')
+    time.sleep(5)
     machine.reset()
 
 # gah!
@@ -44,9 +41,6 @@ def debug():
     print('Debug:')
     print(f'memory used {gc.mem_alloc()}')
     print(f'memory free {gc.mem_free()}')
-    
-    #for k in tuners.keys():
-    #elp()    tuners[k].debug()
 
 # cheat for the game master
 def cheat():
@@ -57,6 +51,31 @@ def cheat():
     message =  f'solution is {a} {b} {c}'
     print(message)
     mqtt_publish(MQTT_ROOT + '/cheat', message)
+
+def start():
+    pass
+
+# execute command received via MQTT
+def do_command(command):
+    if 'start' in command:
+        start()
+    elif 'stop' in command:
+        sys.exit()
+    elif 'reset' in command:
+        machine.reset()
+    elif 'debug' in command:
+        debug()
+    elif 'cheat' in command:
+        cheat()
+    elif 'on' in command:
+        led.value(1)
+    elif 'off'in command:
+        led.value(0)
+    else:
+        print(f'unknown command {msg}')
+
+def process_data(m):
+    pass
 
 # Function to check pin states and execute button_press if state is 0 (pressed)
 def check_button_states(delay_ms=50):
@@ -81,25 +100,29 @@ def check_button_states(delay_ms=50):
                 t.set_last_button_change(current_time)
 
 # messages from subscriptions will be delivered to this callback
-def sub_cb(topic, msg):
+def mqtt_sub_callback(topic, msg):
+    global led
+
+    t=topic.decode()
+    m=msg.decode()
+    
     print('received')
-    print(f'topic ....: {topic.decode()}')
-    print(f'message ..: {msg.decode()}')
+    print(f'topic ....: {t}')
+    print(f'message ..: {m}')
 
-    if 'cheat' in msg.decode():
-        cheat()
-
-    if 'debug' in msg.decode():
-        debug()
-
-    if 'reset' in msg.decode():
-        reset()
+    if 'command' in t:
+        do_command(m)
+    elif 'data' in t:
+        process_data(m)
+    else:
+        print('skip message')
 
 # publish a message on a topic to the mqtt broker
-def mqtt_publish(topic, message):
-    mqttClient.publish(topic, message)
+def mqtt_publish(client, topic, message):
+    client.publish(topic, message)
 
     print('sent')
+    print(f'client....: {client}')
     print(f'topic ....: {topic}')
     print(f'message ..: {message}')
 
@@ -125,23 +148,26 @@ def solved():
 
     debug()
     
-    stepper = Stepper(Pin(16, Pin.OUT), Pin(17, Pin.OUT), Pin(18, Pin.OUT), Pin(22, Pin.OUT))
+    stepper = stepper.Stepper(machine.Pin(16, machine.Pin.OUT),
+                              machine.Pin(17, machine.Pin.OUT),
+                              machine.Pin(18, machine.Pin.OUT),
+                              machine.Pin(22, machine.Pin.OUT))
 
     interval = 0.5
-    last_interval = time()
+    last_interval = time.time()
 
     mqtt_publish(MQTT_ROOT + '/event', 'solved')
 
     # set the antenna turning and lights blinking
     while True:
-        if (time() - last_interval) >= interval:
+        if (time.time() - last_interval) >= interval:
             # Non-blocking wait for MQTT message
             mqttClient.check_msg()
 
             for k,t in tuners.items():
                 t.randomize_display()
 
-            last_interval = time()
+            last_interval = time.time()
 
         stepper.step(1, 10, .3)
 
@@ -191,30 +217,42 @@ if __name__ == '__main__':
     # create a dictionary of tuners
     tuners=dict()
     for t in tuner_values:
-        tuners[t['color']] = Tuner(t['min_val'],t['max_val'],t['tgt_val'],t['display_clk_pinNo'],t['display_dio_pinNo'],t['rotary_clk_pinNo'],t['rotary_dt_pinNo'],t['button_pinNo'],t['color'])
+        tuners[t['color']] = tuner.Tuner(t['min_val'],t['max_val'],t['tgt_val'],t['display_clk_pinNo'],t['display_dio_pinNo'],t['rotary_clk_pinNo'],t['rotary_dt_pinNo'],t['button_pinNo'],t['color'])
 
     # connect to WiFi
     print(f'connecting to wifi {SSID}')
     sta_if = network.WLAN(network.STA_IF)
-    #ap_if = network.WLAN(network.AP_IF)
 
-    #ap_if.active(False)
     sta_if.active(True)
     sta_if.connect(SSID, SSID_PW)
     
     while not sta_if.isconnected():
-        sleep(.1)
+        time.sleep(.1)
 
     # connect to MQTT
-    print(f'Begin connection with MQTT Broker :: {MQTT_BROKER}')
+    print(f'connecting to conole {MQTT_BROKER}')
     mqttClient = MQTTClient(MQTT_ID, MQTT_BROKER, user=MQTT_USER, password=MQTT_PW, keepalive=60)
-    mqttClient.set_callback(sub_cb)
+    mqttClient.set_callback(mqtt_sub_callback)
     mqttClient.connect()
-    mqttClient.subscribe(MQTT_SUB)
+
+    # subscribe to commands and data
+    mqttClient.subscribe(MQTT_COMMAND)
+    print(f'Subscribed to {MQTT_COMMAND} listening for commands')
+
+    mqttClient.subscribe(MQTT_DATA)
+    print(f'Subscribed to {MQTT_DATA} listening for data')
+
+    # tell the console we are up and running
+    print(f'Sending status powered on')
+    mqtt_publish(mqttClient, MQTT_ROOT + '/status', 'poweron')
     
-    print(f'Connected to MQTT Broker :: {MQTT_BROKER}')
-    print(f'Subscribed to {MQTT_SUB}')
-    print(f'waiting for callback function to be called!')
+    # give the game master needed information
+    print(f'Sending cheat')
+    cheat()
+
+    # ToDo: wait for start command
+    print('start sequence')
+    start()
 
     # This protects against a memory error and resets the Pico
     while True:
