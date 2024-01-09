@@ -2,15 +2,15 @@
 Project: Rosycov Mirror
 File:    main.py (for RM device pn)
 Target:  Raspberry Pi Pico W with RP2040
-Description:
+Description: TEMPLATE
 Puzzle n in the Rosycov Mirror series. 
 """
 from config import *
 import errno
 import gc
-from machine import Pin, PWM
+import machine
 import network
-from random import randint
+import random
 import time
 import ubinascii
 from umqtt.simple import MQTTClient
@@ -24,7 +24,7 @@ led = machine.Pin('LED',machine.Pin.OUT)
 def reset():
     debug()
     print('Reset:')
-    sleep(5)
+    time.sleep(5)
     machine.reset()
 
 # gah!
@@ -98,7 +98,7 @@ def main():
 
     # tell the console we are up and running
     print(f'Sending status = online')
-    mqtt_publish(mqttClient, mqtt_root + '/status', 'online')
+    mqtt_publish(mqttClient, mqtt_root + '/status', 'poweron')
     
     # give the game master needed information
     print(f'Sending cheat')
@@ -107,8 +107,8 @@ def main():
     while 1==1:
         mqttClient.check_msg()
         if (time.time() - last_publish) >= publish_interval:
-            random = randint(1,100)
-            mqttClient.publish(mqtt_root + '/random', str(random).encode())
+            r = random.randint(1,100)
+            mqttClient.publish(mqtt_root + '/random', str(r).encode())
             last_publish = time.time()
 
     # solution achieved!
